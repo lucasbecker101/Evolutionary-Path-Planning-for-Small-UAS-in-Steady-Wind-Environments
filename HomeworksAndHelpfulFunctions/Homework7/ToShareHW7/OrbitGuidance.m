@@ -1,0 +1,70 @@
+function guidance_vector = OrbitGuidance(state_array, orbit_speed, orbit_radius, orbit_center, orbit_flag, orbit_gains)
+%Function implementing vector field guidance method for circular orbit
+%following for the ttwistor aircraft
+
+% Extract position
+x = state_array(1);
+y = state_array(2);
+z = state_array(3);
+
+% Orbit center
+xc = orbit_center(1);
+yc = orbit_center(2);
+zc = orbit_center(3);
+
+% Gains
+kr = orbit_gains.kr;
+kz = orbit_gains.kz;
+
+% Relative position to orbit center
+dx = x - xc;
+dy = y - yc;
+dz = z - zc;
+
+% Cylindrical coordinates
+r = sqrt(dx^2 + dy^2);
+theta = atan2(dy, dx);
+
+
+% Desired orbit parameters
+rd = orbit_radius;
+zd = 0;   % since dz already relative to center
+
+
+% Rotation matrix T(theta)
+T = [ cos(theta) -sin(theta) 0;
+      sin(theta)  cos(theta) 0;
+      0           0          1 ];
+
+if orbit_flag < 0
+    direction = -1;
+else
+    direction = 1;
+end
+
+% Cylindrical vector field
+vcyl = [ -kr*(r - rd);
+          direction;
+         -kz*(dz - zd) ];
+
+% Normalize for constant magnitude
+norm_factor = sqrt( (kr*(r-rd))^2 + 1 + (kz*(dz-zd))^2 );
+vcyl = orbit_speed * vcyl / norm_factor;
+
+% Convert to Cartesian
+v_cart = T * vcyl;
+
+% Output guidance vector
+hc = -zc;
+hc_dot = -v_cart(3);     %hard coded as zero
+
+%desired course angle:
+Xc     = atan2(v_cart(2), v_cart(1)); 
+Xc_dot = direction * orbit_speed /r;
+
+Vac = orbit_speed;
+
+guidance_vector = [hc; hc_dot; Xc; Xc_dot; Vac];
+
+
+end

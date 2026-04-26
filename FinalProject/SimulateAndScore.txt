@@ -1,0 +1,100 @@
+function score = SimulateAndScore(path, aircraft_parameters, control_gains, wind, xstar, ustar)
+% this function will simulate the aircraft dynamics for the given path and
+% then score the path based on throttle usage, time to reach target, and
+% distance traveled.
+
+
+guidance_params.bcd = 0.5;
+guidance_params.bc = 0.22;
+guidance_params.bhd = 0.18;
+guidance_params.bh = 0.01;
+guidance_params.bVa = 0.13;
+
+
+
+x_init = xstar;
+x_init(3) = -1805;
+x_init(4) = 0*pi/180;       % Needs to be changed to match start of current path
+
+
+
+%defining the line to follow:
+X_line = deg2rad(45);
+gamma_line = deg2rad(10);
+r = [200; 0; -h_trim];
+q = [cos(gamma_line) * cos(X_line); cos(gamma_line) * sin(X_line); -sin(gamma_line)];
+line_speed = V_trim;
+d_line = linspace(0, line_speed * tf, 100);
+
+n_pts_line = r(1) + d_line * q(1);
+e_pts_line = r(2) + d_line * q(2);
+h_pts_line = -r(3) + d_line * -q(3);
+
+
+
+%guidance tuning parameters:
+line_params.X_inf = deg2rad(30);
+line_params.k_path = 0.01;
+
+%setting initial state for simulation
+aircraft_array(:,1) = x_init;
+control_array(:,1) = ustar;
+time_iter(1) = 0;
+control_gain_struct.Ts = 0.1; %time step
+
+for i=1:n_ind
+
+    TSPAN = Ts*[i-1 i];
+
+    wind_array4(:,i) = wind_inertial;
+
+    wind_body4 = TransformFromInertialToBody(wind_inertial, aircraft_array(4:6,i));
+    air_rel_vel_body4 = aircraft_array(7:9,i) - wind_body4;
+    wind_angles4(:,i) = AirRelativeVelocityVectorToWindAngles(air_rel_vel_body4);
+
+
+    %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+    %%% Guidance level commands
+    %%%
+    %%%   control_objectives(1) = h_c;
+    %%%   control_objectives(2) = h_dot_c;
+    %%%   control_objectives(3) = chi_c;
+    %%%   control_objectives(4) = chi_dot_ff;
+    %%%   control_objectives(5) = Va_c;
+    %%%
+    %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+    % STUDENTS WRITE THIS FUNCTION
+    control_objectives = StraightLineGuidance(aircraft_array(1:3,i), line_speed,r,q,line_params); 
+
+
+    %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+    % Autopilot
+    %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+    [control_out, x_c_out] = SLCWithFeedForwardAutopilot(Ts*(i-1), aircraft_array(:,i), wind_angles4(:,i), control_objectives, control_gain_struct);
+    
+    control_array(:,i) = control_out;
+    x_command(:,i) = x_c_out;
+    x_command(5,i) = trim_variables(1);
+
+
+    %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+    %%% Aircraft dynamics
+    %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+    [TOUT2,YOUT2] = ode45(@(t,y) AircraftEOM(t,y,control_array(:,i),wind_inertial,aircraft_parameters),TSPAN,aircraft_array(:,i),[]);
+
+
+    aircraft_array(:,i+1) = YOUT2(end,:)';
+    time_iter(i+1) = TOUT2(end);
+    wind_array(:,i+1) = wind_inertial;
+    control_array(:,i+1) = control_array(:,i);
+    x_command(:,i+1) = x_command(:,i);
+end
+
+
+
+
+
+score = 0;
+end
