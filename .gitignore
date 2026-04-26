@@ -1,0 +1,8 @@
+# MATLAB specific ignores
+*.asv
+*.mat
+*.slxc
+*.autosave
+*.txt
+*.png
+*.fig
