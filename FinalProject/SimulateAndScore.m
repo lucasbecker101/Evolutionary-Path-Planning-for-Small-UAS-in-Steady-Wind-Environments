@@ -238,8 +238,8 @@ function [score, aircraft_array, throttle_score, time_score] = SimulateAndScore(
     % obstacle term dominates: a single collision tanks the total score
     % below any collision-free path regardless of time/throttle performance
     if cost_function
-        w_time     = 0.2;
-        w_throttle = 0.4;
+        w_time     = 0.4;
+        w_throttle = 0.2;
         w_obstacle = 0.4;
     else
         w_time     = 0.6;
